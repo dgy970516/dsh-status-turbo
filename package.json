@@ -1,0 +1,61 @@
+{
+  "name": "dsh-status-turbo",
+  "version": "0.21.1",
+  "description": "DSH 插件：把「现在到底卡在哪」变成 composer 上方一行会跳的状态条。支柱 A1 —— 阶段 / 本阶段已耗时 / 本步 token / 缓存命中率 / 无进展告警。纯日志投影驱动，不读宿主内存、不轮询、不注入 DOM。",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "status-bar",
+    "latency"
+  ],
+  "license": "MIT",
+  "author": "dgy970516",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dgy970516/dsh-status-turbo.git"
+  },
+  "homepage": "https://github.com/dgy970516/dsh-status-turbo#readme",
+  "bugs": {
+    "url": "https://github.com/dgy970516/dsh-status-turbo/issues"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "docs",
+    "test",
+    "tools",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-modules",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  }
+}

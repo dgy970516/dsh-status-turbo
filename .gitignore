@@ -1,0 +1,14 @@
+# 打包与构建产物
+dist/
+*.tgz
+node_modules/
+
+# 本地临时脚本（不属于发布内容）
+/_*.mjs
+/_*.md
+
+# 备份 / 系统文件
+*.bak*
+.DS_Store
+Thumbs.db
+*.log

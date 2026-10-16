@@ -1,0 +1,177 @@
+# dsh-status-turbo bundle patch —— 把本插件插进 profile 的 layer stack。
+#
+# 这一行加载包的 main 入口作为**宿主半**（普通 Cordis 插件，注册 wire 投影 `turbo`）；
+# package.json 的 `dsh.client` 声明让 Web 端再去加载 ./client 作为**浏览器半**（状态条）。
+#
+# ⚠️ 一个 profile 若把本包手工写进自己的 cordis.patch.yml，就**不要**同时把它列进
+# `dsh.profile.bundles`：那一行会把插件加载两次（同 id 的第二次路由/投影注册会被拒）。
+- insert:
+    - id: dsh-status-turbo
+      name: 'dsh-status-turbo'
+      config:
+        # ── 支柱 A（看得见）：状态条 ──────────────────────────────
+        statusBar: true
+        noProgressMs: 90000
+        # ── 支柱 B1（省算力）：按步降推理档 ───────────────────────
+        # 只在"连续 ≥2 个已结束的步骤里，只跑了只读工具、且一次错误都没有"时降一档；
+        # 一旦出现写入类工具或报错立刻回到原档。只降不升。
+        # 关掉它：downgrade: false
+        downgrade: true
+        # 最多降到哪一档（按该模型公布的有序档位表取下标；模型没公布这一档就退化为一档一档降）
+        downgradeFloor: low
+        # 连续多少个"干净只读步"才降档。设 1 会更早降档，但也更容易误降。
+        minQuietSteps: 2
+        # 0.9.2（P1-4）：哪些工具算"纯读取" —— B1 降档判据的**唯一**依据；不在表里的一律视为
+        # "可能写"（保守方向）。此前这个键只被代码读、不在 DEFAULT_CONFIG 也不在本文件里（隐藏键）。
+        # 元素必须是非空字符串；过滤后为空 = "未配置"，回落同一份默认表（不是"没有只读工具"）。
+        readOnlyTools: ['read', 'read_image', 'glob', 'grep', 'list_dir', 'search_context', 'web_search', 'web_fetch', 'cordis_inspect_list', 'cordis_inspect_query']
+        # ── 支柱 B3（省上下文）：结果瘦身 ─────────────────────────
+        # 结果正文 UTF-8 字节数达到它才考虑落盘；与装配层的 tool-result-pruner 是 AND 关系。
+        spillThresholdBytes: 32768
+        # 0.6.5 本地兜底瘦身：拿不到宿主 toolResultPruner 时（preset 的 isolate 把服务关在
+        # cordis:group 内，组外按设计读不到），用插件自己的保头保尾裁剪，而不是放弃瘦身。
+        # 保留头多少字符。
+        localTrimHeadChars: 4096
+        # 保留尾多少字符。
+        localTrimTailChars: 1024
+        # 最长文本块短于它就不裁（本地裁剪门槛，与外层字节门槛无关）。
+        localTrimMinChars: 8192
+        # ── 支柱 B4（看得见）：前缀作废的触发源 ───────────────────
+        # 单条 tool/result 载荷达到这么多字节即算一次"大块注入"（压缩事件恒真触发）。
+        bulkInjectionBytes: 32768
+        # ── 支柱 C1（有证据）：可核对证据白名单 ───────────────────
+        # 3 条完整正则字面量（含定界斜杠与 flag）的字符串形式；命中任一条即视为有证据。
+        evidenceWhitelist:
+          - '/exit code:?\s*0\b/mi'
+          - '/(^|\n)\s*(#\s*(pass|tests|suites)\s+\d+|\d+\s+passing|Tests:\s+\d+\s+passed|Test Suites:\s+\d+\s+passed|ok\s+\d+\s+-)/m'
+          - '/(^|\n)\s*(Successfully compiled|Compiled successfully|Found 0 errors|\d+\s+files?\s+checked,?\s*0\s+errors|Build succeeded|Done in \d)/mi'
+        # ── 支柱 C3（别自嗨）：卡住判定与文案抑制 ──────────────────
+        # 卡住时做什么：warn（默认，只提醒）｜nudge｜stop。
+        stuckAction: warn
+        # 连续多少个 turn/end 里没出现新工具名算"卡住"。
+        stuckRounds: 3
+        # 同一聚合键重复多少次算"卡住"。
+        stuckRepeats: 3
+        # 连续 U+FFFD 的最长连段达到它才提醒编码损坏。
+        mojibakeMinRuns: 2
+        # ── 0.6.0 内容层（看得见）：活动流 ─────────────────────────
+        # 活动环缓冲最多保留几条（超过从头部丢）。
+        activityLimit: 24
+        # 活动环缓冲总字节上限（UTF-8，超过从头部丢）。
+        activityBytes: 8192
+        # 单条模型思考截断到的字符数。
+        reasoningChars: 400
+        # 工具结果 / 报错保留的首行数。
+        resultHeadLines: 6
+        # 工具参数脱敏键：大小写不敏感、子串匹配；命中的键值上屏前换成 '***'。
+        redactKeys:
+          - key
+          - token
+          - secret
+          - password
+          - passwd
+          - pwd
+          - authorization
+          - cookie
+          - dsn
+          - apikey
+          - credential
+        # ── 0.6.1 等待态（看得见）：把「等子代理 / 等人」从「最慢的工具」里分出去 ──
+        # 命中这些工具名的调用不计入 topTools，而单列进 waitTools；状态条也会显示等待态。
+        # 元素为工具名；非数组 / 非字符串元素一律忽略（空数组 = 该类别不拦）。
+        subagentWaitTools:
+          - wait_agent
+        humanWaitTools:
+          - ask_user_question
+        # ── 0.6.3 等待态（看得见）：第 4 类「等后台任务」 ──────────
+        # 命中这些工具名、且该次调用的 arguments 里 wait === true 时才归为 job：
+        # 不带 wait 的快照是"取一次状态"的真执行，仍算普通工具。
+        jobWaitTools:
+          - job_output
+          - job_wait
+        # ── 0.6.3 诊断（看得见）：慢调用标记 ──────────────────────
+        # 单次调用耗时 ≥ 这个毫秒数的行前加 ⚠，并在分区末尾提示可改交后台任务。
+        slowMs: 60000
+        # ── 0.7.0 交接文档自动导出（看得见）：越过阈值就把会话导成交接文档 ──
+        # 总开关；**默认开**（用户要求：装上就工作）。显式写 false 时它真的什么都不做
+        # （不探测命令、不起进程、不建目录）。
+        handoffExport: true
+        # 触发阈值：本步要发出去的输入 token（usage.inputTokens）达到它才考虑导出。
+        # 口径与 bili preflight 那条 payload core text 一致。0.8.1 从 400000 降到 240000：
+        # 本机体感卡点实测 341421，而 bili 自己的提醒线是有效窗口 75%（≈654K）⇒ 它不会提醒你。
+        handoffExportTokens: 240000
+        # 节流：距上次导出又长了这么多输入 token 才再导一次。0.8.1 从 100000 降到 60000。
+        handoffExportMinDeltaTokens: 60000
+        # 导出目录（相对会话 cwd）。
+        handoffExportDir: 'handoff'
+        # 是否带 --full（附每个块的原始消息；文档会大很多）。
+        handoffExportFull: false
+        # bili 可执行文件路径；空串表示自动探测（显式配置 → 解析出的包目录 → profile 的
+        # node_modules/billion-context/dist/index.js，一律用 node 跑它；不用 .bin 的 .cmd）。
+        handoffExportBiliBin: ''
+        # 0.9.2（P1-4）：单次 `bili export` / 车道列表读取的硬超时（毫秒），此前写死在
+        # lib/handoff.js:120000。超时先 kill，两个管道 destroy，宽限期后升级 SIGKILL。
+        handoffExportTimeoutMs: 120000
+        # ── 0.7.3（P1-1 / P1-4 / P2-1）──
+        # 阈值的窗口比例上限：模型窗口已知（日志里的 request/context）时，
+        # 实际阈值 = min(handoffExportTokens, 该比例 × 窗口)，换小窗口模型也不会够不着。
+        # 0.8.1 从 40 降到 25：旧值 40%×1M = 400000 恰好等于旧 token 旋钮 ⇒ 不 binding 的假保险。
+        handoffExportWindowPercent: 25
+        # 本进程最多起多少次导出（原来是硬编码 8；0.7.5 默认抬到 64 —— 字节口径下 8 次会被瞬间用光）。
+        handoffExportMaxPerProcess: 64
+        # 是否连该会话的子车道（|<sub:…>）一起导出（先读一次 bili 的车道列表）。
+        # 0.7.8 默认改为 false：一次越桶会按车道数乘一份（实测本会话 1 主 + 8 子 = 9 份）。
+        handoffExportSubLanes: false
+        # ── 0.7.4（P0-3 的字节口径）──
+        # 模型可见体量的估计字节数达到它就触发（与 token 口径**取或**）。
+        # 0.8.1 从 3000000 降到 1800000 = 240000 × 7.5（bili 自己的 bytes/token）；
+        # 窗口已知时实际阈值 = min(它, handoffExportWindowPercent% × 窗口 × 7.5)。
+        handoffExportBytes: 1800000
+        # 字节口径的节流。历史：0.7.7 曾抬到 8000000。0.8.1 降到 450000 = 60000 × 7.5 ——
+        # 因为 8000000 **大于**阈值 3000000，字节口径的第二次导出**永远不会发生**（死路）。
+        handoffExportMinDeltaBytes: 450000
+        # ── 0.7.7 ──
+        # 只对「新鲜事件」触发：折到的事件距现在超过这么多毫秒就不动作
+        # （挡冷启动重放：重放会把整份历史一次性折进来，那时按累计量判断会瞬间写出几十份）。
+        handoffExportFreshMs: 300000
+        # ── 0.7.8 ──
+        # 同一车道是否允许重复导出：0（默认）= 已有任何一份就不再导（每车道最多 1 份）；
+        # 设成字节增量（例如 32000000）才恢复"随水位桶刷新"。
+        handoffExportRefreshBytes: 0
+        # ── 0.8.0 到量轮换（开新会话 + 引用旧会话 + 归档旧的）── 0.9.0 起为方案 B
+        # off / manual（面板一行 + 按钮，点了才切）/ auto（到量自动跑）。
+        # 0.9.1 默认改成 auto（用户拍板）：方案 B 既不 fork 也不归档（rotationArchiveOld: false），
+        # 轮换的后果只是多出一个空白会话；漏掉轮换却会继续背全部历史到 bili preflight 拒发。
+        rotation: 'auto'
+        # 0.20.0：到量时只提醒、不建会话（用户 m07554 拍板「去掉新会话生成；更改为提醒」）。
+        # 只有字面量 true 才恢复「建空白会话 + 写种子 + 切过去」。设置页里可热改。
+        rotationCreate: false
+        # 0.9.2：是否要求「当前没有开放轮次」（phase === idle）才轮换。默认 false ——
+        # 0.8.0 的 fork 时代需要它（种子要落在开放轮次之外）；0.9.0 方案 B 既不 fork 也不搬上下文，
+        # 建一个空白新会话不会打断正在跑的回合，切换时机交给客户端。
+        # 实测后果：那条从不空闲的会话吃了 4.32 MB 却一次也没轮换。
+        rotationRequireIdle: false
+        # 0.8.1 只对「新鲜事件」触发轮换判据（挡冷启动重放，同 handoffExportFreshMs 的理由）。
+        rotationFreshMs: 300000
+        # 两次轮换的最小间隔（毫秒），防连环轮换。
+        rotationCooldownMs: 600000
+        # 0.9.0 宿主建好新会话后，客户端是否自动切过去。
+        rotationOpenChild: true
+        # 是否归档旧会话。**0.8.1 定为 false**：归档后该会话从各分组视图消失，
+        # 而它读的是与 @ 引用同一份列表投影 ⇒ 「用 @<旧会话id> 查阅」这句指引会失效。
+        # 想回收侧边栏请显式打开（日志与席位都保留，界面里没有取消归档入口）。
+        rotationArchiveOld: false
+        # 0.20.0：宿主建好空白子会话后，按旧会话标题 (N) 递增给它补一个名字。
+        # 为什么又回来了：0.9.0 的空白新建让子会话没有标题事件，而标题回退规则只认「第一条 user
+        # 消息」，于是每一代名字都是同一句种子话术的截断 —— 列表里认不出哪个会话是谁开的。
+        # （这个键 0.9.0 被删是因为它当时只是 sessions.fork 的入参；现在宿主自己成了消费者。）
+        # 只做尽力而为：没挂 session-title 服务 / 旧会话没标题 / 改名被拒都只降级，
+        # 绝不影响建会话（0.21.1 起宿主建完不写任何消息）。
+        rotationIncreaseTitle: true
+        # 0.9.0 新会话首条 user 消息模板（{old} = 旧会话 id，{cwd} = 工作目录）。
+        # 为什么必须有：0.9.0 不再 fork（fork 会把整份旧历史当种子复制，不解决积压），
+        # 模型唯一知道旧会话存在的途径就是这条消息里写明旧会话 id。
+        rotationSeedMessage: '继续旧会话 {old}（工作目录 {cwd}）。需要它的上下文时用 @{old} 查阅，不要假设我记得；先跟我确认要接着做的那件事。'
+        # ── 0.18.0 新会话话术卡（看得见）：面板里给一段可直接复制的开场话术 ──
+        # 与 rotationSeedMessage 同源（同一模板、同一个键）：自动轮换把它写进新会话的第一条
+        # 消息，面板把它的 {old} / {cwd} 填好后给用户一键复制 —— 轮换没触发时的兜底。
