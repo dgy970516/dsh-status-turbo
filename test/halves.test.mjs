@@ -280,6 +280,26 @@ test('客户端半 U1：空闲态常驻「上回合摘要」，不再 return nul
   assert.doesNotMatch(textOf(bare), /undefined|null|NaN/)
 })
 
+test('客户端半（0.21.2）：空闲态行尾同样有「复制话术」按钮（用户 m10188）', async () => {
+  const captured = {}
+  ;(await loadClientModule()).factory((id) => (id === 'react' ? ReactMock : undefined)).apply(makeCtx(captured))
+  const view = captured.component({
+    useProjection: () => ({
+      v: 13,
+      busy: false,
+      phase: 'idle',
+      mountStatus: 'enabled',
+      idleLine: '空闲 · 上回合 12.3s',
+      lastTurnMs: 12300,
+    }),
+    t: (key) => key,
+  })
+  const last = view.children[view.children.length - 1]
+  assert.equal(typeof last.type, 'function', '0.21.2：空闲态行尾也必须是「复制话术」按钮组件')
+  assert.equal(last.props.key, 'copy-brief', '行尾那一格就是复制话术按钮')
+  assert.match(textOf(last.type(last.props)), /复制话术/, '按钮文案取词典 copy.button，不在空闲态丢失')
+})
+
 test('客户端半 P0-1：mountStatus 三态 —— enabled 正常 / disabled return null / 缺失红格', async () => {
   const captured = {}
   ;(await loadClientModule()).factory((id) => (id === 'react' ? ReactMock : undefined)).apply(makeCtx(captured))

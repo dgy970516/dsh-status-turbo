@@ -1,6 +1,6 @@
 {
   "name": "dsh-status-turbo",
-  "version": "0.21.1",
+  "version": "0.21.2",
   "description": "DSH 插件：把「现在到底卡在哪」变成 composer 上方一行会跳的状态条。支柱 A1 —— 阶段 / 本阶段已耗时 / 本步 token / 缓存命中率 / 无进展告警。纯日志投影驱动，不读宿主内存、不轮询、不注入 DOM。",
   "keywords": [
     "deepseek-harness",
