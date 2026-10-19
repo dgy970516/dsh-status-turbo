@@ -82,8 +82,8 @@ const CHANGELOG_094 = `## [0.9.4] —— 审计 0.9.2 的剩余 P1/P2：前端�
 const edits = [
   ['package.json', '"version": "0.9.3"', '"version": "0.9.4"'],
   ['CHANGELOG.md', '## [0.9.3] —— 修 0.9.2 的两条回归 + 给两条主链补上真实覆盖', CHANGELOG_094 + '## [0.9.3] —— 修 0.9.2 的两条回归 + 给两条主链补上真实覆盖'],
-  ['README.zh.md', '# 271 例', '# 293 例'],
-  ['README.md', '# 271 cases', '# 293 cases'],
+  ['README.md', '# 271 例', '# 293 例'],
+  ['README.en.md', '# 271 cases', '# 293 cases'],
   ['docs/acceptance.md', '`DEFAULT_CONFIG` 44 键、测试条数以现场', '`DEFAULT_CONFIG` 46 键、测试条数以现场'],
   ['docs/acceptance.md', '（0.9.3 期间实测 271 条）', '（0.9.4 期间实测 293 条）'],
   ['docs/design.md', '0.9.3 期间实测 271 条', '0.9.4 期间实测 293 条'],

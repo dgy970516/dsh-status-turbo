@@ -50,7 +50,7 @@ const jobs = [
     ],
   ],
   [
-    'README.zh.md',
+    'README.md',
     [
       [
         "| `rotation` | `'manual'` | 到量轮换模式：`off` / `manual`（面板一行 · 可点）/ `auto`。**默认 manual** |",
@@ -113,7 +113,7 @@ if (!changelog.includes('## [0.9.1]')) {
 而漏掉轮换的代价是继续背着全部历史直到 bili preflight 拒发。所以**默认改成 \`auto\`**：到量即自动开新会话，
 并把旧会话 id 写进新会话的首条 \`user/message\`。需要人工确认的场合显式设 \`rotation: 'manual'\`。
 
-三处同值：\`lib/state.js · DEFAULT_CONFIG\`、包内 \`cordis.patch.yml\`、\`README.zh.md\` 配置表。
+三处同值：\`lib/state.js · DEFAULT_CONFIG\`、包内 \`cordis.patch.yml\`、\`README.md\` 配置表。
 \`lib/rotation.js · rotationMode\` 对非法模式名回落的正是这个默认值（模式名写错会得到 \`auto\`）。
 `
   readFileSync('CHANGELOG.md')

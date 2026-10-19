@@ -32,7 +32,7 @@ const SRC = {
   state: read('lib/state.js'),
   handoff: read('lib/handoff.js'),
   rotationHost: read('lib/rotation-host.js'),
-  readme: read('README.zh.md'),
+  readme: read('README.md'),
   design: read('docs/design.md'),
   packaging: read('docs/packaging.md'),
   docHandoff: read('docs/design-handoff-export.md'),

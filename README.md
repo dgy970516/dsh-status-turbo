@@ -1,67 +1,65 @@
 # dsh-status-turbo
 
-> Turns "what is it stuck on right now?" into **one line of ticking text** above the composer.
+[English](README.en.md) · **中文**
 
-`dsh-status-turbo` is a plugin for [DeepSeek Harness](https://github.com/deepseek-ai). It keeps a single thin status bar above the message composer:
+> 让「现在到底卡在哪」变成 composer 上方**一行会跳的字**。
+
+`dsh-status-turbo` 是 [DeepSeek Harness](https://github.com/deepseek-ai) 的插件。它在对话输入框上方常驻一条极窄的状态条，实时显示：
 
 ```
-● Running tool(bash)   2:14   3.1K tok
+● 执行工具(bash)   2:14   3.1K tok
 ```
 
-For those moments three minutes into a long command — page frozen, no log output, is it dead or not — this line is the answer.
+长命令跑到第 3 分钟那种「页面一动不动、日志一行没有、它到底死没死」的时刻，这一行就是答案。
 
 ---
 
-## What it shows
+## 它显示什么
 
-**It sits inside DSH's own composer footer stats row** (the `6 turns · 283 steps / 27.9M tok · cache hit 96% / 10%` line),
-on the right of the shipped entries — so it never adds an extra row or floats above the composer.
-It only fills in what that row does not already show:
+**它并进 DSH 自带的 composer 底部状态行**（就是「6 轮 283 步 · 266 tok/s / 27.9M tok · 缓存命中 96% / 10%」那一行的右侧），
+所以它不额外占一行、也不会突然出现在输入框上方。只补原生那行没有的信息：
 
-| Field | Meaning | Example |
+| 字段 | 含义 | 例子 |
 | --- | --- | --- |
-| **Phase** | `assembling` / `requesting` / `streaming` / `tool(<name>)` / `approval` / `compacting` | `● Running tool bash · 2:14` |
-| **Phase elapsed** | Refreshed every second. **Needs no push** — the client computes it from its own clock, so it keeps ticking while the log is silent | ditto |
-| **Step tokens** | Input + output accumulated for the current step (since 0.19.2 only the number) | `3.1K tok` |
-| **Gear** | **Not on the status bar since 0.19.2** — the app's own effort selector already shows the same value, so it stays in the detail panel. The value is the reasoning effort this step **actually sent** (read from the logged `request/header`, not guessed locally) | — |
-| **No progress** | No new output for more than `noProgressMs` (default 90s) → that cell turns amber and shows how long it has been stuck (since 0.19.2 four words only; the full sentence moves to `title`) | `2:49 no new output` |
+| **阶段** | `组装提示词` / `请求模型` / `接收流` / `执行工具(<名字>)` / `等待批准` / `压缩上下文` | `● 执行工具 bash · 2:14` |
+| **本阶段已耗时** | 每秒刷新。**不依赖任何推送** —— 客户端用本地时钟算，所以日志静止时它照样跳 | 同上 |
+| **本步 token** | 当前 step 累计输入+输出（0.19.2 起只留数量，完整说明进 `title`） | `3.1K tok` |
+| **档位** | **0.19.2 起不再占状态条** —— 原生推理档选择器已经写着同一个值，它只留在详情面板。值是 B1 这一步**实际发出去**的推理档位（取自会话日志的 `request/header`，不是本地推测） | —— |
+| **无进展** | 超过 `noProgressMs`（默认 90s）没有任何新产出 → 该格变黄并标注卡了多久（0.19.2 起只留四个字，判据全文进 `title`） | `2:49 无新输出` |
 
-The host projects this as the `turbo` wire view, **version `v: 13` with 37 keys** — v1's 19 keys, the 9 keys added in v2
-(`mountStatus`, `prefixEpoch`, `prefixCause`, `prefixAt`, `lastTurnMs`, `topTools`, `hookFaults`, `idleLine`, `lastSpill`),
-then one key per later version: v3 `activity`, v4 `waitTools` / `waitKind` / `subagents`, v5 `slowMs`, v6 `enhancement`,
-v8 `handoff`, v9 `rotation`, **v13 `newSession`** (v7 added `enhancement.mode` inside an existing key, and v10 added the
-`rotation.childId` / `seedOk` / `message` fields inside `rotation` — neither raised the top-level key count). `newSession`
-carries the New session page's copy-ready opening text (`{ text, oldId, cwd }`). The client pins `EXPECTED_V = 13`: on a
-version mismatch it renders red text `投影版本错配（宿主 vN ≠ 客户端 vM）` in place of the bar rather than disappearing.
+宿主把这套东西投影成 `turbo` wire 视图，**版本 `v: 13`、共 37 键**（v1 的 19 键 → v2 的 `mountStatus`、
+`prefixEpoch`、`prefixCause`、`prefixAt`、`lastTurnMs`、`topTools`、`hookFaults`、`idleLine`、`lastSpill` → v3 的 `activity`
+→ … → v9 的 `rotation`；v7 与 v10 不在顶层加键。**v13 加顶层 `newSession`**，承载「新会话」页的开场话术
+（`{ text, oldId, cwd }`，见「新会话页（0.18.0）」）。客户端把
+`EXPECTED_V` 钉死在 `13`：版本对不上时，状态条位置显示红字「投影版本错配（宿主 vN ≠ 客户端 vM）」，而不是静默消失。
 
-**Deliberately not repeated** from the shipped row: session turns/steps, tok/s, total tokens, session-level cache hit rate,
-context usage. The per-step cache hit rate stays in the projection data (`hitRate`) but no longer occupies a cell —
-two different "cache hit" numbers on one line only confuse.
+**刻意不重复**原生那行已有的：会话轮/步、tok/s、总 token、会话级缓存命中、上下文占比。
+每步缓存命中率仍留在投影数据里（`hitRate`），但不再单独占一格 —— 同一行里放两个"缓存命中"只会让人分不清。
 
-**While idle the cell does not disappear** — it keeps a one-line summary of the last turn: the phase name plus how
-long that turn took (`● requesting · last turn 42.3s`). The host sends that as `idleLine` / `lastTurnMs`, so the
-summary survives even with no new events.
+**空闲时这一格不再消失** —— 它会保留一条「上回合摘要」：阶段名 + 上回合耗时（`● 请求模型 · 上回合 42.3s`）。
+宿主把它作为 `idleLine` / `lastTurnMs` 下发，所以没有新事件时摘要也还在。
 
-**Clicking the cell opens a detail panel** below the composer (slot `conversation.input.dock`, id `dsh-status-turbo.detail`,
-order 0); clicking again collapses it. While collapsed — or before the first snapshot arrives — the panel renders
-nothing at all. The panel has 11 always-present sections, top to bottom: **Now** (what this step is doing — phase name ·
-elapsed · tool name), **Activity** (the last few 'what the model thought / which tool it called / how it turned out',
-newest first), this turn / last turn / cache and usage / prefix / slowest tools (top 5 by `maxMs`) / waits / rotation /
-enhancement / handoff. Two more are conditional and simply do not appear when empty: the last oversized-result spill
-with its absolute path (`lastSpill`) and recent faults (`hookFaults`).
+**点一下这一格会在输入框下方展开详情面板**（槽位 `conversation.input.dock`，id `dsh-status-turbo.detail`，order 0）；
+再点一下收起。收起状态 —— 或第一份快照还没到 —— 面板完全不渲染。面板从上到下常驻 11 个分区：**现在**（这一步在干嘛，
+阶段中文名 · 已耗时 · 工具名）、**活动流**（最近若干条「模型想了什么 / 调了什么工具 / 结果如何」，最新的在最上面）、
+本回合 / 上回合 / 缓存与用量 / 前缀 / 最慢的工具（取 `maxMs` 前 5）、等待占用 / 会话轮换 / 工具增强 / 交接文档；
+**最近瘦身**（`lastSpill`）与**最近的故障**（`hookFaults`）是条件分区 —— 没有内容就不出现。
 
-**The activity stream is memory-only** (a ring buffer — never written to disk, no new dependencies, no change to the
-requests sent): `assistant/message` records a reasoning excerpt (truncated to `reasoningChars` characters),
-`tool/call` records the tool name and its **redacted** arguments, `tool/result` records the first `resultHeadLines`
-lines of the result / error, and `turn/end` records the stop reason. Argument values whose key matches `redactKeys`
-(case-insensitive substring match) become `'***'` before they ever reach the UI, circular references degrade to
-`[Circular]`, and a dirty argument never throws.
+**活动流只进内存**（环缓冲，不落盘、不新增依赖、不改发出去的请求）：`assistant/message` 记一条思考摘要（截到
+`reasoningChars` 字符）、`tool/call` 记工具名与**已脱敏**的参数、`tool/result` 记结果 / 报错的前 `resultHeadLines` 行、
+`turn/end` 记结束原因。工具参数里命中 `redactKeys`（大小写不敏感、子串匹配）的键值上屏前换成 `'***'`，循环引用降级为
+`[Circular]`，绝不因为脏参数报错。
 
 ---
 
-## Install
+## 安装
 
-Manual (profile assembly): drop the package into the profile's `node_modules`, then in the profile's `cordis.patch.yml`:
+```bash
+# 装进 profile（推荐）
+# 用 DSH 的插件管理器安装，或在 profile 的 cordis.patch.yml 里 insert 本包
+```
+
+手工安装（profile 拼装）——把本包放进 profile 的 `node_modules`，然后在 profile 的 `cordis.patch.yml` 里：
 
 ```yaml
 - insert:
@@ -85,285 +83,328 @@ Manual (profile assembly): drop the package into the profile's `node_modules`, t
         mojibakeMinRuns: 2
 ```
 
-Every key is optional; the block above is a short example (12 of the 46 default keys). The single source of truth for all
-46 defaults is `lib/state.js · DEFAULT_CONFIG`, which the package's own `cordis.patch.yml` mirrors verbatim; every key with
-its default and meaning is tabulated under [Configuration](#configuration) below.
+每个键都可省；上面只是一段最常用的示例（12 键）。完整的 **46 键**与默认值见下文「配置」与
+「交接文档自动导出」「到量轮换」两节的表 —— 默认值的唯一源是 `lib/state.js · DEFAULT_CONFIG`（46 键），
+根目录 `cordis.patch.yml` 逐字镜像它。
 
-> ⚠️ **Do not** list the same package in both `dsh.profile.bundles` and the profile's `cordis.patch.yml` — it would be loaded twice.
+> ⚠️ **不要**把同一个包同时列进 `dsh.profile.bundles` 和 profile 的 `cordis.patch.yml`：会被加载两次。
 
 ---
 
-## Saving compute: per-step reasoning gear (B1)
+## 省算力：按步降推理档（B1）
 
-The plugin watches the tool trajectory and drops the reasoning effort **for that step** when the step plainly
-does not need deep thinking:
+插件会盯着工具轨迹，在**这一步明显不需要深想**的时候把这一步的推理档降一档：
 
-- **≥2 consecutive finished steps** that ran only read-only tools (`read`/`glob`/`grep`/`web_search` …)
-  **with zero errors** → drop one gear;
-- a **write-capable tool** (`bash`/`edit`/`write`/`sql_exec` …) or **any error** → back to the original gear
-  **immediately**;
-- the original gear is whatever you selected for the session. The plugin **only lowers, never raises**, and
-  never touches your default model or provider.
+- 连续 **≥2 个已结束的步骤**里只跑了只读工具（`read`/`glob`/`grep`/`web_search` …）、**且一次错都没报** → 降一档；
+- 一旦出现**写入类工具**（`bash`/`edit`/`write`/`sql_exec` …）或**任何报错** → **立刻**回到原档；
+- 原档是你当前为该会话选定的档位，插件**只降不升**，也**不改**你的默认模型或提供方。
 
-Every downgrade leaves two independent traces: a `B1 降档: …` line in the DSH log, and an extra gear row
-in the detail panel (0.19.2 moved it off the status bar).
+降档会在两个地方留下证据：DSH 日志里的 `B1 降档：…`，以及详情面板里多出来的档位行（0.19.2 起状态条不再重复它）。
 
-| Key | Default | Description |
+| 键 | 默认 | 说明 |
 | --- | --- | --- |
-| `downgrade` | `true` | Master switch. Only an explicit `false` disables it (then `llm` is not even injected) |
-| `downgradeFloor` | `low` | Lowest gear allowed. Compared **by index** in the model's own ordered effort list; if the model does not publish it, drops one gear at a time |
-| `minQuietSteps` | `2` | How many clean read-only steps are required. `1` is more aggressive, and easier to get wrong |
+| `downgrade` | `true` | 总开关。只有显式写 `false` 才关闭（关掉后连 `llm` 服务都不依赖） |
+| `downgradeFloor` | `low` | 最多降到哪一档。按该模型自己公布的**有序**档位表取下标比较；模型没公布这一档就退化为一档一档降 |
+| `minQuietSteps` | `2` | 连续几个"干净只读步"才降档。设 `1` 更激进，也更容易误降 |
+| `readOnlyTools` | 10 个工具名 | 0.9.2（P1-4）：B1 的只读工具白名单 —— 只有**明确只读**的工具才算「纯读取 / 列举 / 检索」；不在表里的工具（`bash` / `edit` / `write` / `sql_exec` / `univer_execute`…）一律视为「可能写」，任何一次这类调用都会打断连续段（刻意保守）。元素必须是非空字符串，非法元素被过滤；过滤后为空则回落本表（`[]` 的语义是「未配置」，不是「没有只读工具」）。默认：`read` / `read_image` / `glob` / `grep` / `list_dir` / `search_context` / `web_search` / `web_fetch` / `cordis_inspect_list` / `cordis_inspect_query` |
 
-No gear name is hard-coded — everything is asked from `ctx.llm.resolveModelInfo()`. Whenever it is unsure
-(no effort list, current gear not published, service missing, judgment threw), it runs the step **at the
-original gear** and never lets the plugin fail a request.
+档位名不写死在代码里 —— 一律问 `ctx.llm.resolveModelInfo()`。任何一步只要它拿不准（读不到档位表、
+模型没公布当前档、服务缺失、判据抛错），就**按原档执行**，绝不因为插件让请求失败。
 
 ---
 
-## Saving context: oversized tool results (B3)
+## 省上下文：超大工具结果瘦身（B3）
 
-When a single tool result is huge, the host half shrinks it before it reaches the model:
+单条工具结果太大时，宿主半会在它送进模型前先瘦身：
 
-- it first asks the host's own `toolResultPruner.pruneContent` to trim the body;
-- if the result is still at or above `spillThresholdBytes` (default 32768), it is handed to the **host's existing
-  spill backend** (`spillStore.saveText`), and the shrunken body carries a notice with the **absolute path** of the
-  saved file — a path you can `read` with `offset`/`limit` or `grep` directly.
+- 先请宿主自己的 `toolResultPruner.pruneContent` 削一遍正文；
+- 削完仍达到 `spillThresholdBytes`（默认 32768）时，交给**宿主既有的 spill 后端**（`spillStore.saveText`）落盘，
+  瘦身后的正文里带一行通知，内含落盘文件的**绝对路径** —— 这条路径可以直接 `read`（配 `offset`/`limit`）或 `grep`。
 
-The notice is rendered verbatim by `lib/spill.js`:
+通知文案由 `lib/spill.js` 原样渲染：
 `（已省略 {bytes} bytes；完整结果落盘于：{locator}。用 read 配 offset/limit，或 grep 这个路径继续。）`
-If the backend hands back a locator that is not an absolute path, the plugin **degrades instead of guessing** (no
-fake path is ever printed). See the "Writes only its own data" note under *Design constraints*: for B3 the write is the
-host's, and the plugin itself never opens a file for writing in that path.
+后端给出的 locator 若不是绝对路径，插件**降级处理而不是猜一个**（绝不印假路径）。落盘那一下是宿主的动作 ——
+见下面「设计约束」里的说明：dsh-status-turbo 自己从不为了写而打开文件。
 
 ---
 
-## Seeing a dead cache prefix (B4)
+## 看得见缓存前缀失效（B4）
 
-Cache-prefix invalidation is visible as a `前缀已失效` pill on the status bar (only while the invalidation is fresh,
-i.e. within the last 5 minutes). The host counts three triggers:
+缓存前缀作废会以状态条上的 `前缀已失效` 胶囊显示（只在作废还新鲜时显示，即最近 5 分钟内）。宿主统计三个触发源：
 
-| Trigger | Condition |
+| 触发源 | 判据 |
 | --- | --- |
-| `compaction-start` / `compaction-end` | a `compaction/start` or `compaction/end` event |
-| `bulk-injection` | one `tool/result` payload ≥ `bulkInjectionBytes` (default 32768) |
+| `compaction-start` / `compaction-end` | 出现 `compaction/start` 或 `compaction/end` 事件 |
+| `bulk-injection` | 单条 `tool/result` 载荷 ≥ `bulkInjectionBytes`（默认 32768） |
 
-The wire view exposes it as `prefixEpoch` / `prefixCause` / `prefixAt`. On a real recorded session this counter read
-**17 invalidations** (`bulk-injection ×9`, `compaction-start ×4`, `compaction-end ×4`) — see `tools/replay-log.mjs`.
+wire 视图里对应 `prefixEpoch` / `prefixCause` / `prefixAt`。在一份**真实回放会话**里这个计数读出来是
+**17 次前缀作废**（`bulk-injection ×9`、`compaction-start ×4`、`compaction-end ×4`）—— 见 `tools/replay-log.mjs`。
 
 ---
 
-## Notes appended inside the same tool return (C1 / C2 / C3)
+## 塞进同一次工具返回里的提示（C1 / C2 / C3）
 
-Three cheap corrections are appended to the **current** tool result — they never add a round trip, and the session's
-step count does not change:
+三条廉价校正都追加在**当前这次**工具返回里 —— **不新增任何往返**，会话步数也不变：
 
-- **C1 — no verifiable evidence**: a result that shows no evidence line at all (nothing matching `evidenceWhitelist`,
-  exactly 3 regex sources, e.g. `exit code: 0`, `N passing`, `Found 0 errors`) gets
-  「上一条没有可核对的证据……别据此下结论。」
-- **C2 — truncated read**: a `read` that used `offset`/`limit` while the file has more lines gets
+- **C1 —— 没有可核对证据**：整条结果里找不到任何证据行（不命中 `evidenceWhitelist`，恰好 3 条正则源，例如
+  `exit code: 0`、`N passing`、`Found 0 errors`）时，追加「上一条没有可核对的证据……别据此下结论。」
+- **C2 —— 读被截断**：一次 `read` 用了 `offset`/`limit` 而文件后面还有内容时，追加
   「你只看了 N / M 行（绝对路径）；后面还有内容没读，别基于这个片段下结论。」
-- **C3 — mojibake / noise**: broken text (≥ `mojibakeMinRuns` runs of U+FFFD) or output swamped by noise gets
-  「这段输出里的中文已经损坏……」 / 「这次输出被噪声淹没（x / y 行不是目标输出）……」
+- **C3 —— 乱码 / 噪声**：中文损坏（连续 U+FFFD 达到 `mojibakeMinRuns` 段）或输出被噪声淹没时，追加
+  「这段输出里的中文已经损坏……」/「这次输出被噪声淹没（x / y 行不是目标输出）……」
 
 ---
 
-## Stuck detection (D) — **warn level only**
+## 交接文档自动导出（0.7.0）—— **默认开**
 
-`stuckAction` defaults to `warn`, which is **zero side effect** (it records a fault, nothing more). `nudge` and
-`stop` only happen if you configure them explicitly — and `stop` additionally requires the host's
-`workspace/session-activity` to report a live session, because it would otherwise kill long-running work such as an
-overnight build. **Known gap:** `stuckRounds` currently has **no consumer** — the host half only sees one half of the
-signal (`stuckRepeats` over consecutive identical aggregate keys), so D is not a complete implementation.
+会话变长时，自动把当前会话导成一份 Markdown 交接文档落进工作区。**为什么需要它**：bili 的 preflight 护栏按
+**单次请求核心文本**判死（`payload core text alone is ~… bytes … vs the model window …`），会话太长时连转发机会
+都没有；而 bili 官方的迁移路径就是 `bili export` 出交接文档（`CONFIGURATION.zh-CN.md:1791`、`:2123-2132`）。
 
----
+判据与执行都在 `lib/handoff.js`（纯逻辑 + 可注入 I/O，测试**不真起进程、不写盘**）：
 
-## The New session page (0.18.0)
+- **阈值口径**：`usage.inputTokens`（本步发出去、被上游计费的输入 token）—— 它量的是 bili **压缩之后**的量，
+  与 bili preflight 那条「单次请求核心文本」判死**不是同一个口径**：preflight 拒发的那一次没有上游响应、
+  也就不会产生 usage 事件，所以**只有字节口径（`handoffExportBytes`）看得见那个失败**。
+- **节流**：距上次导出又长了 `handoffExportMinDeltaTokens` 才再导一次（长会话不会每轮都导）。
+- **命令探测（显式配置一级 + 兜底两级）**：`handoffExportBiliBin` 绝对路径直接用 → 否则用 `process.execPath`（node）
+  跑包内的 `billion-context/dist/index.js`（先 `require.resolve('billion-context')` 定位包根，再兜底拼 profile 的
+  `node_modules/billion-context/dist/index.js`）。**都拿不到是「缺席」，不是故障**：面板显示一行灰色「未找到 bili」，
+  绝不进故障列表。（`.bin/bili.CMD` 这条路**已弃用**：CVE-2024-27980 之后 Node 拒绝无 shell 启动 `.cmd`，实测
+  `spawn` 抛 `EINVAL`；而 `require.resolve('billion-context/dist/index.js')` 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`。
+  证据见 `docs/review-0.7.0-handoff.md` 的 P0-1 / P0-2。）
+- **导出命令**：`bili export <sessionId> [--full] --output <会话 cwd>/<handoffExportDir>/handoff-<时间戳>.md`
+  （`spawn`，非阻塞，120 s 超时；本进程最多 `handoffExportMaxPerProcess` 次，默认 64 —— 0.7.5 从硬编码的 8 抬高）。
+- **不做**：交接导出本身不切会话 —— 界面上打开哪条会话是客户端状态，宿主侧插件改不了。
+  （**「切会话」是另一个能力**：到量轮换会建空白新会话、再让客户端 `sessions.open` 过去，见下文「到量轮换」。
+  0.9.0–0.9.2 客户端那半边**其实一次都没执行**，0.9.3 才修好，见 `CHANGELOG.md · ## [0.9.3]`。）
 
-When a session has grown enough to be handed over (see the `rotation*` keys under *Configuration* below), the rotation creates a **blank**
-child session: since 0.21.1 nothing is written into it (before that the opening script was appended as its first `user/message`, so every new
-session opened with the same paragraph). The **New session** page shows that opening text so you can copy it with one click and paste it into
-the new session — no more making the new session guess what it was supposed to do.
+### 配置（默认值唯一来源是 `lib/state.js · DEFAULT_CONFIG`，`cordis.patch.yml` 逐字镜像）
 
-- **The text is built from the template**: `{old}` becomes the old session id and `{cwd}` the working directory. The
-  default template is `继续旧会话 {old}（工作目录 {cwd}）。需要它的上下文时用 @{old} 查阅，不要假设我记得；先跟我确认要接着做的那件事。`
-- **What the page shows**: a rotation section, the opening text inside a selectable `<pre>`, a **Copy** button (it reports
-  '已复制' once the clipboard write succeeds, and '复制失败，请手动选中' when the clipboard is unavailable or refuses),
-  one line with the working directory, and a hint to paste the text into the new session.
-- **Where it lives**: the bottom of this plugin's **settings page** (`dsh-status-turbo.settings`, right under the config
-  form). 0.18.2 removes the 0.18.0 left-rail entry — one page instead of two, and no sidebar button to keep in sync.
-- **Data comes through the shipped hook**: the settings page is root-scoped with no session binding, so the card reads
-  `useSessions(state => state.current)` and then `state.byId[id]?.projectionValues?.turbo` — the host already publishes
-  every session's projection values inside the session list. No new subscription, HTTP route, or host RPC.
-- **The child session is created through the agent lifecycle (0.19.0)**: the host half now calls
-  `ctx.agents.create({ sessionId, meta })` instead of `ctx.sessions.create(...)`. A session published outside the agent
-  lifecycle never gets a session-log writer, so it persists nothing — it lives in memory only and never appears in the
-  session list. That call is asynchronous: its outcome (and the title pass) is appended to `rotation-trace.jsonl` once it
-  settles. Without an `agents` service the host falls back to the old in-memory path.
-- **…and attached to its workspace (0.19.1)**: persisting is not enough. The left-hand session list is built from
-  each workspace's `sessionIds`, not from disk, so once the create promise settles the host half resolves the
-  workspace by normalized path (`workspaceRegistry.resolveByPath(cwd)`) and calls `attachSession(childId)` — the same
-  step the host's own new-session and fork paths take. The outcome (`attached` / `no-registry` / `no-workspace` /
-  `resolve-failed` / `attach-failed`) lands in `rotation-trace.jsonl`; anything but `attached` also logs a warning.
-- **…carrying a model and a preset, and switching by itself (0.19.3)**: the child agent is created with the parent's
-  model (`agentOptions`, falling back to `agentDefaultModel.currentSelection()`) and the parent's `agentPreset` (mounted
-  through `setup`), because the deployment persona section renders `{{model}}` and a child without one fails its first
-  run.
-- **…and switched through the client's real entry point (0.19.4)**: the client `sessions` service face (0.2.0-rc.2) is
-  `retain` / `using` / `retainInfo` / `refreshProjections` / `search` / `fork` / `scope` / `binding` — there is no `open`,
-  so every attempt fell through to `failed` / `no-service`. The page now prefers `uiWorkspace.openSession(childId)` and
-  keeps `sessions.open` only as a legacy fallback, still retrying for ~20s so the switch survives the
-  create → workspace-attach → session-list trip.
-- **…named after the session it came from, and with a way out of "waiting" (0.20.0)**: a rotation child is a *blank* session
-  (0.9.0 dropped `fork`), so it carries no title events — before 0.21.1 the fallback named it from its first `user/message` (the seed
-  template, identical in every generation), and since 0.21.1 there is no first message at all. The host now reads the parent's persisted title (`ctx.sessionTitle.get`) and renames
-  the child with the same convention `sessions.fork({ increaseTitle: true })` uses (a trailing `(N)` / `（N）` is incremented
-  keeping its brackets; anything else gets ` (1)`); that write is a `user`-source `session/title` event, which pins the title
-  against the fallback. Key: `rotationIncreaseTitle` (default `true`). On the client side the `armed` row is clickable again
-  while `auto` is waiting — one click switches immediately — and a second row switches **and** archives the current session
-  (`performRotation(snapshot, { force: true, archiveOld: true })`). **As of 0.20.0 the host only reminds by default** (`rotationCreate: false`): a threshold crossing is still recognised and still traced, but nothing is created — the panel suggests starting a new session and the opening script is copyable on the settings page; set `rotationCreate: true` to restore the automatic child session.
-- **…plain-spoken and copyable (0.21.0)**: every config field and group label now has a Chinese description (raw keys such as `rotationCreate` no longer appear as labels) — a missing dictionary entry used to fall straight through to the key name because `makeText`'s fallback is supplied at the call site, so the settings page consults `DICT.zh` first and only then the hard-coded fallback. The status bar gained a **Copy** button (left of the collapse toggle) that copies four lines — `会话名称：…` / `会话 ID：…` / `会话日志目录：…` / `继续处理未完成的任务`; a value that is unavailable drops its whole line instead of leaving a placeholder, and the button itself is always rendered — even against a host that sends no `newSession` at all it still copies the closing hand-off sentence. The name comes from the host's `session-title`, the directory is built as `<DSH_HOME>/sessions/<project key>/<session id>` (an empty string when there is no working directory — the path is never guessed); both are fields 0.21.0 added to the wire.
-- **…and nothing is auto-filled into the child (0.21.1)**: the step that appended the opening script as the child's first `user/message`
-  is gone (`seedQuietly` / `seedMessage` deleted), so a rotation child — even with `rotationCreate: true` — is created **empty**, and the
-  script is taken by hand from the status bar's **Copy** button or the settings page. The rotation record no longer carries `seedOk`, and
-  the client no longer renders the "seed written / failed" note.
-- **Three states, stated apart**: no current session ('pick one on the left'), projection not arrived yet ('waiting for
-  this session's projection'), and no opening text reported by the host (a hint line only — no `<pre>`, no Copy button).
-  It never reports 'none' for 'not yet'.
-- **It never rotates anything**: the host half still creates the blank session (since 0.21.1 with nothing written into it); this page
-  only puts the same text in front of you.
-- **On the wire it is the top-level `newSession` key** (`{ text, oldId, cwd }`, v13 / 37 keys).
-
----
-
-## Not implemented this round: B2
-
-Backgrounding long commands (returning a job id within 10s instead of blocking) is **not implemented**. The
-integration target does not exist on this machine (no `dsh-plugin-background-tasks`, and `PreToolDecision` has no
-result-replacing branch), and there is no supported hook for it. Evidence and the three follow-up leads are in
-[`docs/plan-B2.md`](docs/plan-B2.md). Please do not expect a B2 usage that is not there.
-
----
-
-## Configuration
-
-| Key | Default | Description |
+| 键 | 默认 | 含义 |
 | --- | --- | --- |
-| `statusBar` | `true` | Mount switch for the status bar. The host projects it into the wire field `mountStatus` (`'enabled'` / `'disabled'`); the client has **three** states: `enabled` → normal bar; `disabled` → renders nothing; **field absent** (an older host that does not send it) → a red cell `状态条开关缺失：配置未送达` instead of a silent no-op. Off means "no bar", not "silently dead switch" |
-| `noProgressMs` | `90000` | No-progress threshold in milliseconds |
-| `downgrade` | `true` | See the section above |
-| `downgradeFloor` | `low` | See the section above |
-| `minQuietSteps` | `2` | See the section above |
-| `readOnlyTools` | 10 tool names | 0.9.2 (P1-4): the B1 read-only allowlist — only **explicitly read-only** tools count as "pure read / list / search"; anything not listed (`bash` / `edit` / `write` / `sql_exec` / `univer_execute`…) counts as "may write", and one such call breaks the consecutive run (deliberately conservative). Elements must be non-empty strings and invalid ones are filtered; an empty result falls back to this table (`[]` means "not configured", not "no read-only tools"). Defaults: `read` / `read_image` / `glob` / `grep` / `list_dir` / `search_context` / `web_search` / `web_fetch` / `cordis_inspect_list` / `cordis_inspect_query` |
-| `spillThresholdBytes` | `32768` | B3: a result body this many UTF-8 bytes or larger may be spilled (AND-ed with the harness tool-result pruner) |
-| `localTrimHeadChars` | `4096` | 0.6.5: characters of the **head** kept by the local trimmer used when the host pruner is unavailable (`spillThresholdBytes` decides *whether* to spill; these three keys decide how much the model sees) |
-| `localTrimTailChars` | `1024` | 0.6.5: characters of the **tail** kept; the elided middle becomes one line saying how many characters were dropped |
-| `localTrimMinChars` | `8192` | 0.6.5: a longest-text block shorter than this is **not** trimmed (characters, unrelated to `spillThresholdBytes`); a trim no shorter than the original is skipped too |
-| `bulkInjectionBytes` | `32768` | B4: one `tool/result` payload at or above this counts as a "bulk injection" that invalidates the cache prefix |
-| `evidenceWhitelist` | 3 regex sources | C1: 3 complete regex literals as strings (delimiters + flags included); matching any one counts as verifiable evidence |
-| `stuckAction` | `warn` | D: `warn` (default, zero side effect) / `nudge` / `stop` |
-| `stuckRounds` | `3` | D: consecutive `turn/end` without a new tool name. **Currently has no consumer** (known gap) |
-| `stuckRepeats` | `3` | D: how many repeats of the same aggregate key count as stuck |
-| `mojibakeMinRuns` | `2` | C3-a: longest run of consecutive U+FFFD before the encoding warning fires |
-| `activityLimit` | `24` | 0.6.0: how many activity entries the ring buffer keeps (drops from the head past this) |
-| `activityBytes` | `8192` | 0.6.0: total UTF-8 byte cap for the activity ring buffer (drops from the head past this) |
-| `reasoningChars` | `400` | 0.6.0: characters a single reasoning excerpt is truncated to |
-| `resultHeadLines` | `6` | 0.6.0: head lines kept from a tool result / error |
-| `redactKeys` | 11 keys | 0.6.0: argument-redaction keys (case-insensitive substring match): `key` / `token` / `secret` / `password` / `passwd` / `pwd` / `authorization` / `cookie` / `dsn` / `apikey` / `credential` |
-| `subagentWaitTools` | `['wait_agent']` | 0.6.1: waiting tool names (waiting on a subagent); they skip "slowest tools" and are listed as their own wait kind |
-| `humanWaitTools` | `['ask_user_question']` | 0.6.1: waiting tool names (waiting on the user), classified `human` |
-| `jobWaitTools` | `['job_output','job_wait']` | 0.6.3: waiting tool names (waiting on a background job) — the fourth kind. Only a call whose arguments carry `wait: true` counts as `job`; a snapshot without `wait` counts as real execution |
-| `slowMs` | `60000` | 0.6.3: slow-call threshold in milliseconds; a tool whose `maxMs` reaches it carries `slow: true` on the wire, and the client adds ⚠ plus a pointer to the background-tasks plugin |
-| `handoffExport` | `true` | Master switch for the 0.7.0 handoff export. **On by default**; an explicit `false` really does nothing (no probing, no process, no directory) |
-| `handoffExportTokens` | `240000` | Export is considered once the step's input tokens reach this (**lowered from 400000 in 0.8.1** — the measured hard stop on this machine was 341421) |
-| `handoffExportMinDeltaTokens` | `60000` | Re-export only after the session grew by this much (**lowered from 100000 in 0.8.1**) |
-| `handoffExportDir` | `'handoff'` | Export directory, relative to the session cwd |
-| `handoffExportFull` | `false` | Whether to pass `--full` (attaches every block's raw messages; a much larger document) |
-| `handoffExportBiliBin` | `''` | Path to the bili executable; the empty string selects the probing chain described below |
-| `handoffExportTimeoutMs` | `120000` | **0.9.2 (P1-4)**: hard timeout for one `bili export` (and for the lane-list read), in milliseconds. On timeout it kills first, destroys both pipes and only then escalates to `SIGKILL` (`lib/handoff.js · runBili`). One key shared by both call sites (`runExport` / `listLanes`); an invalid value falls back to 120000 |
-| `handoffExportWindowPercent` | `25` | Threshold as a percentage of the model window when the window is known. **One knob shared by the token and byte criteria** (lowered from 40 in 0.8.1: the old 40% × 1M equalled the old token knob, so it never bound) |
-| `handoffExportMaxPerProcess` | `64` | Most exports started per process; exhausting it records `failed` plus one warning (**raised from a hardcoded 8 in 0.7.5**) |
-| `handoffExportSubLanes` | `false` | Whether to export the session's sub-lanes (`\|<sub:…>`) as well. **Off by default since 0.7.8** (one over-threshold lane used to cost one export per lane) |
-| `handoffExportBytes` | `1800000` | **Byte criterion**: fires when the model-visible volume reaches it (OR-ed with the token criterion); **lowered from 3000000 in 0.8.1** = 240000 × 7.5 |
-| `handoffExportMinDeltaBytes` | `450000` | Throttle for the byte criterion (**lowered from 8000000 in 0.8.1** — the old value was *above* the threshold, making a second byte-triggered export a dead end) |
-| `handoffExportFreshMs` | `300000` | Only **fresh** events trigger: an event folded from further back than this many milliseconds does nothing (blocks the cold-start replay burst) |
-| `handoffExportRefreshBytes` | `0` | Whether one lane may be exported repeatedly. **`0` = at most one document per lane** (default since 0.7.8); setting a byte delta restores "refresh per watermark bucket" |
-| `rotation` | `'auto'` | Rotation mode: `off` / `manual` (one clickable panel row) / `auto`. **`auto` by default since 0.9.1** |
-| `rotationCooldownMs` | `600000` | Minimum interval between two rotations (**process-wide**, to break rotation chains) |
-| `rotationOpenChild` | `true` | 0.9.0: whether the client switches to the child session the host created (in `auto` mode it switches automatically) |
-| `rotationFreshMs` | `300000` | 0.8.1: rotation is judged only on fresh events (same purpose as `handoffExportFreshMs`) |
-| `rotationRequireIdle` | `false` | **0.9.2**: whether rotation requires the session to have no open round. Default `false` — creating a blank session does not interrupt a running turn; `true` restores the 0.8.0 behaviour (measured: a session that is never idle never rotates) |
-| `rotationArchiveOld` | `false` | Whether to archive the old session after switching (**`false` since 0.8.1**: archiving drops it from the same list projection the `@` picker reads, so the `@{old}` lead would break, and the UI has no un-archive entry) |
-| `rotationIncreaseTitle` | `true` | **0.20.0**: whether a rotation child is renamed after the parent's persisted title with the official `(N)` convention (the parent's title is read through `ctx.sessionTitle.get`, the child written through `rename`; an absent service, a missing title or a failed rename only downgrade) |
-| `rotationCreate` | `false` | **0.20.0**: whether a threshold crossing actually creates a new session. `false` (the default) only records `remind` — `shouldRotate` still recognises "at threshold", but nothing is created and the client shows a suggestion; set `true` to restore the 0.19.x automatic child session |
-| `rotationSeedMessage` | `'继续旧会话 {old}（工作目录 {cwd}）。…'` | 0.9.0: the opening-script template (`{old}` = old session id, `{cwd}` = working directory). **Since 0.21.1 it is no longer written into the new session** — it only renders the text you copy from the status bar button or the settings page; that copy is now the only route that puts the old session id into the context |
+| `handoffExport` | `true` | 总开关。**默认开**（装上就工作）；显式写 `false` 时它真的什么都不做（不探测、不起进程、不建目录） |
+| `handoffExportTokens` | `240000` | 本步输入 token 达到它才考虑导出（**0.8.1 从 400000 降** —— 本机实测体感卡点是 341421） |
+| `handoffExportMinDeltaTokens` | `60000` | 距上次导出又长了这么多才再导（**0.8.1 从 100000 降**） |
+| `handoffExportDir` | `'handoff'` | 导出目录（相对会话 cwd） |
+| `handoffExportFull` | `false` | 是否带 `--full`（附每个块的原始消息；文档会大很多） |
+| `handoffExportBiliBin` | `''` | bili 可执行路径；空串表示走上面的两级探测 |
+| `handoffExportTimeoutMs` | `120000` | **0.9.2（P1-4）**：单次 `bili export`（以及车道列表读取）的硬超时（毫秒）。超时路径先 kill，两个管道 `destroy` 之后宽限期到了再升级 `SIGKILL`（`lib/handoff.js · runBili`）；两个调用点（`runExport` / `listLanes`）共用这一个键，非法值回落 120000 |
+| `handoffExportWindowPercent` | `25` | 阈值 = 窗口的百分之多少（窗口已知时）。**token 与字节两个口径共用这一个旋钮**（0.8.1 从 40 降：旧值 40%×1M 恰好等于旧 token 旋钮 ⇒ 不 binding） |
+| `handoffExportMaxPerProcess` | `64` | 本进程最多起多少次导出；用满会记 `failed` + 一条 warn |
+| `handoffExportSubLanes` | `false` | 是否连该会话的子车道（`\|<sub:…>`）一起导。**0.7.8 默认关**（一次越桶会按车道数乘一份） |
+| `handoffExportBytes` | `1800000` | **字节口径**：模型可见体量达到它就触发（与 token 口径**取或**）；**0.8.1 从 3000000 降** = 240000 × 7.5 |
+| `handoffExportMinDeltaBytes` | `450000` | 字节口径的节流（**0.8.1 从 8000000 降** —— 旧值**大于**阈值，字节口径的第二次导出是条死路） |
+| `handoffExportFreshMs` | `300000` | 只对**新鲜事件**触发：折到的事件距现在超过这么多毫秒就不动作（挡冷启动重放的批量触发） |
+| `handoffExportRefreshBytes` | `0` | 同一车道是否允许重复导出。**`0` = 每车道最多 1 份**（0.7.8 默认）；设成字节增量才恢复「随水位桶刷新」 |
+| `rotation` | `'auto'` | 到量轮换模式：`off` / `manual`（面板一行 · 可点）/ `auto`。**默认 auto（0.9.1 起）** |
+| `rotationCooldownMs` | `600000` | 两次轮换的最小间隔（**进程级**生效，防连环轮换） |
+| `rotationOpenChild` | `true` | 0.9.0：宿主建好新会话后是否自动切过去（`auto` 模式下即自动切） |
+| `rotationFreshMs` | `300000` | 0.8.1：只对新鲜事件触发轮换判据（挡冷启动重放，同 `handoffExportFreshMs`） |
+| `rotationRequireIdle` | `false` | **0.9.2**：是否要求「当前没有开放轮次」才轮换。默认 `false` —— 建一个空白新会话不打断正在跑的回合；设 `true` 回到 0.8.0 的老行为（实测后果：从不空闲的会话一个也轮换不了） |
+| `rotationArchiveOld` | `false` | 切换成功后是否归档旧会话（**0.8.1 定为 false**：归档后侧边栏与 `@` 引用读**同一份列表投影** ⇒ `@{old}` 指引会失效；界面里没有取消归档入口） |
+| `rotationIncreaseTitle` | `true` | 轮换建出的子会话是否按旧会话标题做 `(N)` 递增改名（**0.20.0 起复活**：0.9.0 起是空白新建，子会话没有标题事件 —— 0.20.0 之前回退规则只能拿首条种子模板截断 ⇒ 每一代同名，**0.21.1 起连那条首条消息也没有了**，自动命名更加认不出亲；宿主现在自己成了消费者，命名与官方 `sessions.fork({ increaseTitle: true })` 同一套约定） |
+| `rotationCreate` | `false` | 到量时是否真的建新会话（**0.20.0 起默认 `false`：只提醒**）。判据照旧走 `shouldRotate`，但只落一条 `remind` 记录（`ROTATION_STATUS.REMIND`）、不建会话不切界面；设 `true` 恢复 0.19.x 的自动建会话 |
+| `rotationSeedMessage` | `'继续旧会话 {old}（工作目录 {cwd}）。…'` | 0.9.0 起是开场话术的模板（`{old}` = 旧会话 id，`{cwd}` = 工作目录）。**0.21.1 起不再自动写进新会话** —— 它只用于状态条「复制话术」与设置页话术卡那段可复制文本；**这段文字是「把旧会话 id 送进上下文」的唯一来源**（光有 `parentSession` 元数据不保证进模型上下文） |
 
-Restart DSH after changing configuration.
+> **「模型可见体量」是累计吃进去的字节数**（累积的消息体 + 最新一次请求头），**刻意不回落**：
+> 本部署里 compaction 并没有把 payload 压下去（炸掉的那条车道压缩了 4027 次、最终仍到 ~17 MB），
+> 所以累计量才是能提前报警的信号。另外 `handoff.message` 是**稳定 code**（面板按语言渲染，未知 code 原样显示）。
+>
+> **触发策略（0.7.8 起）**：只有**正在跑**的会话会触发（`handoffExportFreshMs`），且**每个车道最多只出一份**
+> （`handoffExportRefreshBytes: 0`），默认还不导子车道 ⇒ 一个会话通常就 **1 份**。
+> 0.7.7 之前是「3 MB 出第一份、之后每多 8 MB 补一份」，0.7.6 更早时是每 3 分钟一份
+> （当天实测写掉 64 份、把进程上限用尽）。
 
-Note: the per-key behaviour of the `handoffExport*` and `rotation*` families (0.7.0 handoff export, 0.8.0+ rotation) is
-described in Chinese in [`README.zh.md`](README.zh.md) §「交接文档自动导出」/§「到量轮换」; the defaults above are the
-same values.
+详情面板的「交接文档」分区会显示 `未开启 / 等待达到阈值 / 正在导出… / 已导出 → <路径> / 导出失败 · <原因> /
+未找到 bili`，路径可直接选中复制。
 
 ---
 
-## Manual acceptance
+## 到量轮换（0.8.0 起；0.9.0 改为方案 B；0.9.1 起默认 `auto`）
 
-| # | Steps | Expected |
+越过阈值**且折到的事件是新鲜的**（`rotationFreshMs`；0.9.2 起**不再要求会话空闲**，见 `rotationRequireIdle`）时，**宿主半**直接把轮换做完（不再只写一个 `armed` 让客户端去 fork）：
+
+1. 宿主建一个**空白**会话（新会话的 header 带 `cwd` 与 `parentSession`，但**不继承旧历史**）。**0.19.0 起走 `ctx.agents.create({ sessionId, meta })`** —— 在代理生命周期里发布，持久化层才会给它挂写句柄，会话因此**落盘、能在会话列表里看到**（拿不到 `agents` 服务时退回 `ctx.sessions.create` 的老行为：会话只活在内存里，列表里看不到）；**0.19.3 起建会话时一并带上模型选择**（沿用旧会话正在用的 `provider` / `model`，取不到用宿主默认选择）**与旧会话的 `agentPreset`**（`setup` 里挂同一套组合）—— 不带模型的话，子会话一跑就是「本轮运行失败」（系统提示里的 `{{model}}` 渲染时是空的）；
+   
+2. **0.21.1 起不再往新会话写任何消息**（用户 2026-10-16：「这个应该改成手动复制，请你把这个开启新会话 自动填充这个的去掉」）：建出来的就是**空白会话**。原先那一步（append 首条 `user/message`，文字来自 `rotationSeedMessage` 模板，也曾是「把旧会话 id 送进上下文」的唯一落点）已删除；那段开场话术现在只从状态条「复制话术」按钮或设置页话术卡**手动复制**；
+3. 把 `childId` / `message` 写进**旧会话**的轮换记录（wire v10；0.21.1 起记录里不再有 `seedOk`），再由客户端切过去；
+4. **0.19.1 起补最后一步：把它挂进工作区。** 左侧会话列表是按各工作区的 `sessionIds` 列的，落盘不等于列出来 —— 于是建完再 `workspaceRegistry.resolveByPath(cwd)` 找目标工作区、`attachSession(childId)`（宿主自己的新建 / 分叉路径同样这么做）。挂载结果（`attached` / `no-workspace` / `attach-failed` …）进 `rotation-trace.jsonl`；挂不上只少一个列表项，落盘与播种不受影响。
+
+**为什么废掉 fork**：`sessions.fork` 会把整份旧事件日志复制进新会话 —— 上下文积压正是要解决的问题，
+fork 等于把它原样搬过去。方案 B 只把一个 id 送过去，需要细节时让模型用 `@<旧会话id>` 查。
+
+客户端那一半只做一件事：切到新会话。**0.19.4 起走 `uiWorkspace.openSession(childId)`** —— 本机客户端运行时（0.2.0-rc.2）的 `sessions` 服务面里没有 `open`（只有 `retain` / `using` / `retainInfo` / `refreshProjections` / `search` / `fork` / `scope` / `binding`），旧的 `sessions.open` 只作回落。切过去要求该 id **已在客户端会话列表里**
+（宿主建完会话会推 `host/session-added` 帧），而帧到达与投影更新之间有竞态 ⇒ 有界重试（0.19.3 起 40 次 × 500 ms ≈ 20 秒）；
+仍失败就把那一行写成「新会话已就绪 · 点这里重试」，**那一行可点**（客户端没有 toast API，提示只能落在面板/状态条）。
+`rotationArchiveOld` **默认 false**：开场话术里的 `@<旧id>` 要靠旧会话留在列表投影里才解析得到，归档后 `@` 列表里就看不到它了。
+**0.20.0 起子会话的名字认得出是谁开的**：宿主建好子会话后，读旧会话的持久化标题（`ctx.sessionTitle.get(sessions.get(旧 id))`），按官方 `sessions.fork({ increaseTitle: true })` 的同一套约定递增（尾部 `(N)` / `（N）` 保留括号样式递增，其余追加 ` (1)`），再用 `ctx.sessionTitle.rename(子会话, 名字)` 写回 —— 写进去的是 `source: { kind: 'user' }` 的 `session/title` 事件，会把标题钉住，`session-title` 的回退生成不再覆盖它。开关是 `rotationIncreaseTitle`（默认 `true`，与 0.8.0 同名同义）；服务缺席 / 没有标题 / 改名失败一律只降级，结果进 `rotation-trace.jsonl` 的 `titleOk` / `title` / `titleReason`（不改 wire）。
+
+**0.9.1 起默认就是全自动（`rotation: 'auto'`）**；想改成「先给我看一行、点了才切」就把 `rotation` 设成 `'manual'`。判据、四条硬约束与全部 API 证据见 `docs/design-rotation.md`。
+
+**0.9.3 修好了「自动会切」这件事本身**（0.9.0–0.9.2 只写在文档里）：那两版把 `auto` 的触发点写在**详情面板**的一个分区里，
+而详情面板默认是收起的（`collapsed` 初值 `true`，收起时直接 `return null`）⇒ **实际一次都没自动切过**。
+现在触发点挂在**常驻的状态条**上（`React.useEffect`，渲染返回 `null` 时也照样执行）。同一处还修了两个连带问题：
+轮换结果落地后**会广播一次**通知重渲染（此前结果存在单槽位里，面板会一直停在「正在轮换…」）；
+`ready` / `failed` 那一行**可点重试**，且 wire 换了 `childId` / `at` 就作废本地结果（此前一次失败 = 该会话永久不再尝试）。
+
+**0.9.2 起不再要求「空闲」才建会话**（`rotationRequireIdle: false`），水位账也从「进程内 Map」改成写进投影 state 的 `ledger`（跨重启保留，**不进 wire**）—— 0.9.0/0.9.1 实测轮换全史 0 次的两条原因（重启归零：1.66 MB vs 阈值 1.80 MB；从不空闲：4.32 MB 却一直在同一回合）就在这里。`auto` 模式下客户端会**等会话空闲再切**，未空闲时那一行显示「新会话已就绪 · 等当前回合结束再切」。 **0.20.0 起那行不再只能干等**：点击它 = 立刻切过去（不必等这一轮跑完），并且等待态会多出一行「切过去并归档当前会话」（`performRotation(snapshot, { force: true, archiveOld: true })`）。 **0.20.0 起默认只提醒**：判据照旧认「到量」，但宿主什么都不建 —— 只写一条 `remind` 记录，界面提示「建议开新会话」（开场话术在设置页可复制）；要恢复自动建会话把 `rotationCreate` 设成 `true`（**0.21.1 起它建出来的也是空白会话**：话术要你自己粘）。
+
+**0.9.3 收紧了账里装什么**：只装**只增不减的水位**（`payloadBytes` / `headerBytes` / `payloadSeq` / `laneWatermarks`）与一个**终态事实 `rotationChildId`**，`handoff` / `rotation` 的 status **一律不进账**。0.9.2 把「正在导出（120 s 窗口）」「找不到 bili / 没有 cwd」这类**临态**也写了进去，而宿主对这两种状态直接 `return` ⇒ 一次异常就被**跨进程永久化**，该会话此后再也不导出、也不轮换（**这是 0.9.2 的回归**；旧的持久化 ledger 仍被容忍，只读新字段）。
+
+---
+
+## 新会话话术卡（0.18.0，0.18.2 并入设置页）
+
+轮到换一具身体时（到量轮换，见上一节）**新会话是空的**：0.21.1 起宿主不再往它写任何消息（0.20.0 之前会 `append` 一条 `rotationSeedMessage` 渲染出的开场话术，于是「每次开新会话都冒出同一段」）。
+开场话术改成**手动**取：状态条上的「复制话术」按钮，或「新会话」页那段可复制的文本 —— 粘进新会话，不必再让它从零猜「接着做哪件事」。
+
+- **话术由模板拼出**：`{old}` 换成旧会话 id、`{cwd}` 换成工作目录。默认模板 =
+  「继续旧会话 {old}（工作目录 {cwd}）。需要它的上下文时用 @{old} 查阅，不要假设我记得；先跟我确认要接着做的那件事。」
+- **页面内容**：轮换分区 + 开场话术（`<pre>`，可直接选中）+ 一个**复制**按钮（复制成功显示「已复制」，
+  拿不到剪贴板或写入被拒就说「复制失败，请手动选中」）+ 工作目录一行 + 一行提示「在新会话里粘贴这段文本」。
+- **它长在哪**：本插件**设置页**的最下面（`dsh-status-turbo.settings`，紧挨配置表单）。0.18.2 把 0.18.0 的左侧栏入口整条撤掉 ——
+  一页顶两页，也没有侧栏按钮要跟着 id 同步。
+- **取数走标准钩子**：设置页是 root 作用域、没有会话绑定，用 `useSessions(state => state.current)` 取当前会话，
+  再读 `state.byId[id]?.projectionValues?.turbo` —— 宿主已经把每个会话的投影值放进会话列表，
+  **没有新订阅、没有 HTTP 路由、没有宿主 RPC**。
+- **三态分得清**：没有当前会话说「先在左侧选一个会话」；投影还没到说「等待该会话的投影」；
+  宿主没报出话术文本时只给提示行，不给 `pre` 与复制按钮。**不把「还没到」说成「拿不到」。**
+- **它不发起轮换**：自动轮换仍由宿主半完成（建一个**空白**新会话，0.21.1 起不再写任何消息），这个页面只把话术摆出来给你复制。
+- **0.21.0：这一页说人话，状态条能「复制这一段」**。设置页里每个字段名与分组名都有中文描述（不再显示 `rotationCreate` 这种原始键名 —— 词典缺条目时会**先查 `DICT.zh` 再退兜底**，不再直接吐键名）。状态条右侧多一个**复制**按钮，复制四行：`会话名称：…` / `会话 ID：…` / `会话日志目录：…` / `继续处理未完成的任务`；**某一项拿不到就整行省掉**（不留空占位），按钮本身始终在（最差也能复制到最后那句「继续处理未完成的任务」）。会话名称取自宿主的 `session-title`，日志目录按 `<DSH_HOME>/sessions/<工作目录键>/<会话 id>` 拼出（没有工作目录就给空串，不猜路径）——两者都是 0.21.0 新进 wire 的字段。
+- **0.21.1：不再自动写进新会话**。宿主半删掉了「建完会话再 `append` 首条 `user/message`」那一步（`seedQuietly` / `seedMessage` 两个函数一并删除），`rotationCreate: true` 建出来的也只是**空白**会话；`rotationSeedMessage` 仍然生效 —— 它现在只负责渲染**给人复制**的那段文本。连带收紧：轮换记录不再带 `seedOk`，客户端不再渲染「种子消息已写入 / 失败」那行小字。
+- **wire 上是顶层 `newSession`**（`{ text, oldId, cwd }`；v13 的 37 键里它排在最后）。
+
+---
+
+## 卡死自愈（D）—— **只做到 warn 层**
+
+`stuckAction` 默认是 `warn`，**零副作用**（只记一条故障，别的什么都不做）。`nudge` 和 `stop` 必须显式配置才会发生；
+而 `stop` 还额外要求宿主的 `workspace/session-activity` 报告会话仍在活动 —— 否则它会顺手杀掉整夜构建这类长任务。
+**已知缺口：** `stuckRounds` 目前**没有消费者** —— 宿主半只能看见判据的一半（连续同一聚合键达到 `stuckRepeats`），
+所以 D 不是完整实现。
+
+---
+
+## 本轮没做：B2
+
+长命令后台化（10 秒内返回 job id 而不是阻塞对话）**本轮未实现**。集成目标在本机不存在（没有
+`dsh-plugin-background-tasks`，且 `PreToolDecision` 没有替换结果的分支），也没有受支持的钩子可用。理由与证据、
+以及三条接续排查点见 [`docs/plan-B2.md`](docs/plan-B2.md)。请不要去找并不存在的 B2 用法。
+
+---
+
+## 配置
+
+| 键 | 默认 | 说明 |
 | --- | --- | --- |
-| 1 | Have the model run `ping -n 120 127.0.0.1` (~2 min) | Within 1s the bar appears, phase = `Running tool(bash)`, elapsed ticks from 0 |
-| 2 | Do nothing for 2 minutes | Elapsed keeps advancing; a silent log never freezes it |
-| 3 | Wait for the command to finish | Phase returns to `requesting`, then the cell flips to the idle summary `last turn …` — it does **not** vanish |
-| 4 | Set `statusBar: false` and restart | No bar at all (the host still folds state, very cheap). If the **field `mountStatus` is missing** — i.e. an older host half — the cell instead shows the red `状态条开关缺失：配置未送达`; that red cell is a failure signal, not a working "off" |
-| 5 | Produce more than `spillThresholdBytes` (32 KiB) of tool output in one result | The body is pruned and carries a notice with a **readable absolute path** (the spill locator) |
-| 6 | Have the model claim "tests passed" without running them; or make it `read` a file with `offset`/`limit` | A correction note appears inside the **same** tool return — no extra round trip, session step count unchanged |
-| 7 | Run a command that emits GBK mojibake, or one buried in noise | An "encoding broken" / "noise" note appears in the same tool return |
-| 8 | Leave one step silent for 2 minutes | At 90s (`noProgressMs`) the no-progress cell turns amber and counts up |
-| 9 | Inject memory / trigger compaction mid-session | A `前缀已失效` pill appears within 5 minutes, cause = `压缩开始` / `压缩结束` / `大块结果注入` |
-| 10 | Remove the `conversation.composer.dock` declaration (or use a non-existent slot name) and restart | UI **does not crash**; console shows `[dsh-status-turbo] 状态条 3 秒内未能挂载到 conversation.composer.dock…` |
-| 11 | Tamper with the projection version `v` | Red text "投影版本错配" appears in place of the bar instead of silently vanishing |
+| `statusBar` | `true` | 状态条挂载开关。宿主把它投影成 wire 字段 `mountStatus`（`'enabled'` / `'disabled'`）；客户端有**三态**：`enabled` → 正常显示；`disabled` → 完全不渲染；**字段缺失**（老宿主不下发这个字段）→ 显示红格「状态条开关缺失：配置未送达」，而不是静默什么都不做。关掉的含义是「不显示状态条」，不是一个悄悄失效的开关 |
+| `noProgressMs` | `90000` | 无进展判定阈值（毫秒）。超过则状态条转黄并显示卡了多久 |
+| `downgrade` | `true` | 见上一节 |
+| `downgradeFloor` | `low` | 见上一节 |
+| `minQuietSteps` | `2` | 见上一节 |
+| `spillThresholdBytes` | `32768` | B3：结果正文达到这么多 UTF-8 字节才考虑落盘（与宿主 tool-result-pruner 是 AND 关系） |
+| `localTrimHeadChars` | `4096` | 0.6.5：拿不到宿主 pruner 时本地裁剪**保留的头部字符数**（外层 `spillThresholdBytes` 决定「要不要落盘」，这三个键决定「给模型看多少」） |
+| `localTrimTailChars` | `1024` | 0.6.5：本地裁剪**保留的尾部字符数**；被省掉的中间段替换成一行「此处省略 n 个字符」 |
+| `localTrimMinChars` | `8192` | 0.6.5：最长文本块短于它**就不裁**（与 `spillThresholdBytes` 无关，单位是字符）；裁剪结果不短于原文时同样不裁 |
+| `bulkInjectionBytes` | `32768` | B4：单条 `tool/result` 载荷达到这个字节数即算一次「大块注入」，会作废缓存前缀 |
+| `evidenceWhitelist` | 3 条正则源 | C1：3 条完整正则字面量（含定界斜杠与 flag）的字符串形式；命中任一条即视为有可核对证据 |
+| `stuckAction` | `warn` | D：`warn`（默认，零副作用）/ `nudge` / `stop` |
+| `stuckRounds` | `3` | D：连续多少个 `turn/end` 没出现新工具名。**目前没有消费者**（已知缺口） |
+| `stuckRepeats` | `3` | D：同一聚合键重复多少次算「卡住」 |
+| `mojibakeMinRuns` | `2` | C3-a：连续 U+FFFD 的最长连段达到它才提醒编码损坏 |
+| `activityLimit` | `24` | 0.6.0：活动流环缓冲最多保留几条（超过从头部丢） |
+| `activityBytes` | `8192` | 0.6.0：活动流环缓冲总字节上限（UTF-8，超过从头部丢） |
+| `reasoningChars` | `400` | 0.6.0：单条模型思考截断到的字符数 |
+| `resultHeadLines` | `6` | 0.6.0：工具结果 / 报错保留的首行数 |
+| `redactKeys` | 11 键 | 0.6.0：工具参数脱敏键（大小写不敏感、子串匹配）：`key` / `token` / `secret` / `password` / `passwd` / `pwd` / `authorization` / `cookie` / `dsn` / `apikey` / `credential` |
+| `subagentWaitTools` | `['wait_agent']` | 0.6.1：等待类工具名（等子代理）。命中者不参与「最慢工具」，而是单列进等待态 |
+| `humanWaitTools` | `['ask_user_question']` | 0.6.1：等待类工具名（等用户回答），归类为 `human` |
+| `jobWaitTools` | `['job_output','job_wait']` | 0.6.3：等待类工具名（等后台任务）—— 第 4 类。**只有参数带 `wait: true`（真的在阻塞等待）**才归 `job`；不带 `wait` 的快照算真执行 |
+| `slowMs` | `60000` | 0.6.3：慢调用阈值（毫秒）。`maxMs` 达到它的工具在 wire 上带 `slow: true`，客户端加 ⚠ 并把超时命令指向后台任务插件 |
 
-The original §6 row 2 ("long commands stop blocking; a background job id within 10s") **does not apply this round** —
-B2 is not implemented, see [`docs/plan-B2.md`](docs/plan-B2.md). It is deliberately dropped and explained rather than
-left as a gap, so the rows above are renumbered into a continuous 1–11.
+改配置后需要重启 DSH 生效。
 
 ---
 
-## Development
+## 手工验收（§6）
+
+装好后在界面上按下面几条走一遍：
+
+| # | 步骤 | 期望 |
+| --- | --- | --- |
+| 1 | 让模型跑一条 `ping -n 120 127.0.0.1`（约 2 分钟） | 1 秒内出现状态条，阶段 = `执行工具(bash)`，耗时从 0 开始每秒跳 |
+| 2 | 什么都不做，盯着看 2 分钟 | 耗时正常推进；日志没有任何新事件也不会冻住 |
+| 3 | 等命令结束 | 阶段切回 `请求模型`，随后这一格切成空闲摘要「上回合 …」—— 它**不会**消失 |
+| 4 | 关掉 `statusBar` 重启 | 状态条完全不出现（宿主半仍在折叠状态，成本极低）。但若**字段 `mountStatus` 缺失**（即老宿主半），这一格会显示红字「状态条开关缺失：配置未送达」；那个红格是**故障信号**，不是「关掉生效了」 |
+| 5 | 让一次性工具输出超过 `spillThresholdBytes`（32 KiB） | 正文被瘦身，并带上含**可读绝对路径**（落盘 locator）的通知 |
+| 6 | 让模型没跑测试却宣称"测试通过"；或让它用 `offset`/`limit` 读一个文件 | **同一次**工具返回里就出现校正提示 —— 不新增往返，会话步数不变 |
+| 7 | 跑一条会产出 GBK 乱码的命令，或被噪声淹没的命令 | 同一次返回里出现「编码损坏」/「噪声」提示 |
+| 8 | 造一个静默 2 分钟的步骤 | 到 90s（`noProgressMs`）时无进展那一格变黄并往上计数 |
+| 9 | 会话中途注入记忆 / 触发压缩 | 5 分钟内出现 `前缀已失效` 胶囊，原因 = `压缩开始` / `压缩结束` / `大块结果注入` |
+| 10 | 把 `conversation.input.dock` 的声明去掉（或换成不存在的槽位名）重启 | 界面**不崩**；控制台出现 `[dsh-status-turbo] 状态条 3 秒内未能挂载到 conversation.input.dock…` |
+| 11 | 宿主半改成一个不存在的 `key` 版本（篡改 `v`） | 状态条位置出现红字「投影版本错配」，而不是静默消失 |
+
+§6 的原始第 2 行（长命令不再阻塞对话，10 s 内返回后台 job id）**本轮不适用**：B2 未实现，理由与证据见
+[`docs/plan-B2.md`](docs/plan-B2.md)。这条是**删掉并说明**，不是留空洞 —— 所以上表重新编号成连续的 1–11。
+
+---
+
+## 开发
 
 ```bash
-node --test "test/*.test.mjs"      # pure fold + host/client contracts + UI contract + hooks
+node --test "test/*.test.mjs"      # 纯函数 + 宿主/客户端契约 + UI 契约 + 钩子
 ```
 
-- **No build step**: `lib/` is source and artifact at once.
-- **No zod**: projection schemas use a passthrough stub (see `docs/design.md` §2.3).
-- **Verify without opening the GUI** — replay a real committed session log:
+**不用开界面也能验收** —— 拿真实的已落盘会话日志复算：
 
-  ```bash
-  node tools/replay-log.mjs <session.v4.jsonl.zstd> [--peek] [--max N] [--stall-ms N]
-  ```
+```bash
+node tools/replay-log.mjs <session.v4.jsonl.zstd> [--peek] [--max N] [--stall-ms N]
+```
 
-  It runs the exact same fold and labels over the log, printing which event changed the strip to what, and finally **the longest tool-silence window** — i.e. what the strip was showing during it. Measured on this session:
+它会对同一份日志跑完全相同的折叠与文案，逐行打印「哪个事件让状态条变成了什么」，最后给出**最长的一次工具静默窗口** —— 那就是状态条在这段时间里一直在显示的东西。实测本会话：
 
-  ```
-  # jsonl lines 1182      # parseable events 1182 (bad lines skipped 0)
-  # longest tool window: pwsh silent 50.4s (at session +52m34s,
-  #   strip should read "执行工具(pwsh)  50.4s")
-  ```
+```
+# jsonl 行数 1182      # 可解析事件 1182（跳过坏行 0）
+# 最长工具窗口: pwsh 静默 50.4s（发生在会话 +52m34s，
+#   状态条此时应显示「执行工具(pwsh)  50.4s」）
+```
 
-  (Session logs live in `D:\deepseek-harness\sessions\<workspace-slug>\session-<id>\session.v4.jsonl.zstd` and are **multi-frame** zstd; the tool splits on the `28 B5 2F FD` magic and inflates frame by frame.)
-- Layout: `lib/state.js` (pure fold: no services, no `Date.now()`, no third-party dependency; one Node builtin import — `node:crypto` for the A2 tool-argument fingerprint), `lib/index.js` (host half: the `turbo` wire projection plus B1 gear switching and the B3/C/D post-execute hooks), `lib/config.js` (the config schema built from `DEFAULT_CONFIG`, the live-config reader, and volatile-value unwrapping), `lib/gears.js` (B1 judgment, zero imports, tool-trajectory only), `lib/spill.js` (B3 — hands oversized results to the host's spill backend and renders the locator notice), `lib/notes.js` (C1/C2/C3 note texts and judgments, plus tool aggregation for the detail panel), `lib/handoff.js` (0.7.0 handoff export: threshold/throttle/freshness judgments, bili command probing, export argv), `lib/rotation.js` (pure rotation judgment `shouldRotate`, fed by the same `handoffExport*` thresholds), `lib/rotation-host.js` (0.9.0 plan B host action: creates the blank child session and writes the seed message — never throws), `lib/client.js` (client half: the summary cell at `conversation.composer.dock`, the detail panel at `conversation.input.dock`, and the New session card at the bottom of the plugin's settings page), `tools/replay-log.mjs` (offline replay), `test/hooks.test.mjs` + `test/ui-contract.test.mjs` (host-hook and UI-contract guards), `test/panel.test.mjs` (0.18.0 New session page guard: text card, copy button and its two messages, three-state fallback, icon and registration), `test/mirror.test.mjs` + `test/client-audit.test.mjs` (config-mirror / wire-version and client-audit guards), plus the per-pillar test files for the fold, gears, notes, spill, handoff, rotation and the two halves.
+（会话日志在 `D:\deepseek-harness\sessions\<workspace-slug>\session-<id>\session.v4.jsonl.zstd`；它是**多帧** zstd，工具内部按 magic `28 B5 2F FD` 切帧后逐帧解压。）
+
+- **没有构建步骤**：`lib/` 即源码即产物，改完直接重启 DSH 即可。
+- **不依赖 zod**：投影 schema 用直通 stub（依据见 `docs/design.md` §2.3）。
+- 目录：
+  - `lib/state.js` —— 纯折叠函数（不碰任何服务、不碰 `Date.now()`、无第三方依赖；仅一处 Node 内建 import：`node:crypto`，用于 A2 的工具参数指纹）
+  - `lib/index.js` —— 宿主半（注册 `turbo` wire 投影 + B1 按步降档 + B3/C/D 的 post-execute 钩子）
+  - `lib/gears.js` —— B1 的纯判据（零 import，只吃工具轨迹）
+  - `lib/spill.js` —— B3：把超大结果交给宿主的 spill 后端，并渲染 locator 通知
+  - `lib/notes.js` —— C1/C2/C3 的提示文案与判据，外加详情面板要用的工具聚合
+  - `lib/handoff.js` —— 0.7.0 交接导出：阈值/节流/新鲜度判据、bili 命令探测（显式配置 → 包内 entry → profile 兜底）、导出 argv
+  - `lib/rotation.js` —— 到量轮换的纯判据 `shouldRotate`（与交接导出同源阈值；`handoffExport*` 键名下）
+  - `lib/rotation-host.js` —— 0.9.0 方案 B 的宿主动作：建空白新会话（0.21.1 起不再写消息）+ 按源标题补名 + 记结果，**绝不抛**
+  - `lib/client.js` —— 客户端半，往 `conversation.input.dock` 挂摘要格、往 `conversation.input.dock` 挂详情面板，并把「新会话」话术卡追加在设置页最下面（0.18.2 起左侧栏入口已撤）
+  - `tools/replay-log.mjs` —— 用真实日志离线复算状态条
+  - `test/hooks.test.mjs` ＋ `test/ui-contract.test.mjs` —— 宿主钩子与 UI 契约的门禁
+  - `test/panel.test.mjs` —— 「新会话」话术卡的门禁：开场话术渲染、复制按钮与两种结果文案、三态兜底、设置页同时挂配置表单与话术卡
+  - `docs/design.md` —— **设计与实读依据**（每个接口都有 `文件:行`）
+  - `docs/plan-B2.md` —— 本轮为什么不实现 B2
 
 ---
 
-## Design constraints (non-negotiable)
+## 设计约束（不可违反）
 
-- Reads **only committed session-log events** (via a projection). No host memory, no polling, no DOM injection, no React-fiber walking.
-- No network requests, no routes. **Writes only its own data:** *dsh-status-turbo itself* does import write APIs (`existsSync` from `node:fs` and `mkdir` / `readFile` / `readdir` / `rename` / `writeFile` from `node:fs/promises`, `lib/index.js:58-59`), and it touches writes in exactly two places, both of them its own data: ① the oversized result body for B3 is **delegated to the host's existing spill backend** (`spillStore.saveText`) and the plugin only prints back the absolute path it was handed — it opens no file for that path itself; ② since 0.7.0 the handoff export creates its directory and drops a `.gitignore` into it (`lib/index.js:538`, content in `lib/handoff.js:246`). Both of those calls goes through the plugin's own `hostIo` seam (`lib/index.js:436`) — it writes to disk no other way, and it never writes user settings.
-- Never touches `agent-default-model`, compaction config, or any user setting.
-- Never rewrites tool arguments or intercepts tools.
-- Every failure must **surface** (in the UI, or at minimum a `console.error` naming the cause). Silent `return` is not allowed.
+- 只读**已 commit 的会话日志**（投影）。不读宿主内存、不轮询、不注入 DOM、不爬 React fiber。
+- 不发网络请求、不注册路由。**「不落盘」要写准：** 插件自己只在两处碰写，都不改会话日志、不改用户设置 ——
+  ① B3 把超大结果**委托宿主既有的 spill 后端**落盘，插件只把拿回来的绝对路径印进正文；
+  ② 0.7.0 交接导出前建目录、并写一个 `.gitignore`（`lib/index.js`）。
+  除此之外 `lib/` 不写盘。
+- 不改 `agent-default-model`、不改 compaction 配置、不改任何用户设置。
+- 不改写工具参数、不拦截工具。
+- 任何失败都必须**显示到界面上**（或至少 `console.error` 点名原因），不允许静默 return。
 
 ---
 
-## License
+## 许可
 
-MIT — see `LICENSE`. Third-party notes in `THIRD_PARTY_NOTICES.md`.
+MIT，见 `LICENSE`。第三方说明见 `THIRD_PARTY_NOTICES.md`。

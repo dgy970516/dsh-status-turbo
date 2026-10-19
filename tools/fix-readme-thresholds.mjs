@@ -1,7 +1,7 @@
-// tools/fix-readme-thresholds.mjs —— 0.8.1 的配置表镜像（README.zh.md 与 DEFAULT_CONFIG 必须同值）。
+// tools/fix-readme-thresholds.mjs —— 0.8.1 的配置表镜像（README.md 与 DEFAULT_CONFIG 必须同值）。
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const file = 'README.zh.md'
+const file = 'README.md'
 const pairs = [
   [
     '| `handoffExportTokens` | `400000` | 本步输入 token 达到它才考虑导出（1M 窗口的 40%） |',
